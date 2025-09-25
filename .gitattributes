@@ -1,0 +1,18 @@
+# Auto normalize text files to LF in repo, let Git convert locally if needed
+* text=auto
+
+# Explicit overrides
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.ts text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.mjs text eol=lf
+.vscodeignore text eol=lf
+.vscode-test.mjs text eol=lf
+
+# Binary
+*.png binary
+*.jpg binary
+*.vsix binary

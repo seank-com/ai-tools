@@ -1,0 +1,16 @@
+GET http://localhost:52877/mcp-health
+
+###
+
+POST http://localhost:52877/mcp HTTP/1.1
+Accept: application/json, text/event-stream
+content-type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list",
+  "params": {}
+}
+
+###
