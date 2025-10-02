@@ -1,9 +1,10 @@
-// mcp/server.js
+require("./dom-shim.js");
+
 const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
-const fs = require("fs").promises;
 const path = require("path");
+const { extractPdfPage } = require("./pdf");
 
 function createMcpServer() {
   // If the extension provided a workspace path via environment, switch to it
@@ -34,31 +35,41 @@ function createMcpServer() {
 
   console.log('ai-tools: createMcpServer invoked, creating server', { name: 'ai-tools', version: '0.0.1' });
   server.registerTool(
-    "read_file",
+    "read_pdf",
     {
-      title: "Read file",
-      description: "Read a UTF-8 file from the current workspace",
+      title: "Read PDF",
+      description: "Extract text content from a PDF file within the workspace",
       inputSchema: {
-        path: z.string().min(1).describe("Path relative to workspace root")
+        path: z.string().min(1).describe("Path relative to workspace root"),
+        page: z.number().int().min(1).optional().describe("Page number (1-based) to extract")
       }
     },
-    async ({ path: rel }) => {
-      console.log('ai-tools: read_file handler input:', path);
+    async ({ path: rel, page }) => {
+      console.log('ai-tools: read_pdf handler input:', { path: rel, page });
 
       try {
         const abs = resolveSafe(rel);
         console.log('ai-tools: resolved path ->', abs);
-        const text = await fs.readFile(abs, "utf8");
-        console.log('ai-tools: read_file succeeded, length=', text.length);
+        const result = await extractPdfPage(abs, page ?? 1);
+        const payload = {
+          ...result,
+          hasMore: result.page < result.pageCount
+        };
+        const text = JSON.stringify(payload, null, 2);
+        console.log('ai-tools: read_pdf succeeded', {
+          page: result.page,
+          pageCount: result.pageCount,
+          textLength: result.text.length
+        });
         return { content: [{ type: "text", text }] };
       } catch (err) {
-        console.error('ai-tools: read_file error for path', rel, err);
+        console.error('ai-tools: read_pdf error for path', rel, err);
         throw err;
       }
     }
   );
 
-  console.log('ai-tools: registered tool read_file');
+  console.log('ai-tools: registered tool read_pdf');
 
   return server;
 }
