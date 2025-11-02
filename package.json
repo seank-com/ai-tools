@@ -22,8 +22,22 @@
       {
         "command": "ai-tools.refreshMcpServers",
         "title": "AI Tools: Refresh MCP Servers"
+      },
+      {
+        "command": "ai-tools.google.signIn",
+        "title": "AI Tools: Google Sign In"
       }
     ],
+    "configuration": {
+      "title": "AI Tools",
+      "properties": {
+        "aiTools.google.clientId": {
+          "type": "string",
+          "default": "",
+          "description": "Google OAuth client ID for the AI Tools extension."
+        }
+      }
+    },
     "mcpServerDefinitionProviders": [
       {
         "id": "ai-tools.provider",

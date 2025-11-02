@@ -14,6 +14,10 @@ function activate(context) {
   const http = require('http');
   const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
   const createMcpServer = require(path.join(context.extensionPath, 'mcp', 'server.js'));
+  const googleAuth = require(path.join(context.extensionPath, 'mcp', 'googleAuth.js'));
+
+  const successHtml = '<html><body><h1>Success</h1><p>You may close this window and return to VS Code.</p></body></html>';
+  const errorHtml = '<html><body><h1>Error</h1><p>You may close this window and return to VS Code.</p></body></html>';
 
   function startMcpServerWithWorkspace() {
     // Set workspace root for MCP server file resolution
@@ -23,10 +27,10 @@ function activate(context) {
       console.log('ai-tools: set AI_TOOLS_WORKSPACE to', ws.uri.fsPath);
     }
     if (httpServer) {
-      try { httpServer.close(); } catch (e) {}
+      try { httpServer.close(); } catch (err) { console.warn('ai-tools: failed to close http server', err); }
       httpServer = undefined;
     }
-    mcpServerInstance = createMcpServer();
+    mcpServerInstance = createMcpServer({ context });
     transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     mcpServerInstance.connect(transport).then(() => {
       console.log('ai-tools: MCP server connected at activation');
@@ -38,6 +42,30 @@ function activate(context) {
       if (req.method === 'GET' && req.url === '/mcp-health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'ok' }));
+        return;
+      }
+      if (req.method === 'GET' && req.url && req.url.startsWith('/oauth/google')) {
+        try {
+          const base = `http://127.0.0.1:${dynamicPort || 0}`;
+          const url = new URL(req.url, base);
+          const code = url.searchParams.get('code');
+          const error = url.searchParams.get('error');
+          const errorDescription = url.searchParams.get('error_description');
+          const handled = googleAuth.handleOAuthRedirect({ code, error, errorDescription });
+          if (!handled) {
+            console.warn('ai-tools: received unexpected google oauth callback');
+          }
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(error ? errorHtml : successHtml);
+        } catch (err) {
+          console.error('ai-tools: failed to process oauth callback', err);
+          try {
+            res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(errorHtml);
+          } catch (sendErr) {
+            console.error('ai-tools: failed to respond to oauth callback', sendErr);
+          }
+        }
         return;
       }
       if (req.method !== 'POST' || req.url !== PATH) {
@@ -81,6 +109,11 @@ function activate(context) {
       dynamicPort = httpServer.address().port;
       serverUri = `http://localhost:${dynamicPort}${PATH}`;
       console.log('ai-tools: in-process HTTP MCP endpoint listening at', serverUri);
+      try {
+        googleAuth.setLoopbackPort(dynamicPort);
+      } catch (err) {
+        console.error('ai-tools: failed to set google auth loopback port', err);
+      }
       _mcpEmitter.fire(); // Notify provider to refresh with new port
     });
   }
@@ -137,6 +170,18 @@ function activate(context) {
     }
   });
   context.subscriptions.push(refreshMcpCommand);
+
+
+  const googleSignIn = vscode.commands.registerCommand('ai-tools.google.signIn', async () => {
+    try {
+      await googleAuth.ensureSession(context);
+      vscode.window.showInformationMessage('Google account connected.');
+    } catch (err) {
+      console.error('ai-tools: google sign-in failed', err);
+      vscode.window.showErrorMessage(`Google sign-in failed: ${err.message || err}`);
+    }
+  });
+  context.subscriptions.push(googleSignIn);
 
   console.log('Congratulations, your extension "ai-tools" is now active!');
 }
