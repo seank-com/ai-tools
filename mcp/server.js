@@ -5,8 +5,12 @@ const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio
 const { z } = require("zod");
 const path = require("path");
 const { extractPdfPage } = require("./pdf");
+const createReadEmailTool = require("./tools/google.readEmail.js");
+const createReadCalendarEventsTool = require("./tools/google.readCalendarEvents.js");
+const createReadContactsTool = require("./tools/google.readContacts.js");
 
-function createMcpServer() {
+function createMcpServer(options = {}) {
+  const { context } = options;
   // If the extension provided a workspace path via environment, switch to it
   // so file resolution and any relative operations use the intended
   // workspace root.
@@ -70,6 +74,24 @@ function createMcpServer() {
   );
 
   console.log('ai-tools: registered tool read_pdf');
+
+  if (context) {
+    try {
+      const googleAuth = require("./googleAuth.js");
+      const deps = { context, googleAuth };
+      const emailTool = createReadEmailTool(deps);
+      server.registerTool(emailTool.name, emailTool.definition, emailTool.handler);
+      const calendarTool = createReadCalendarEventsTool(deps);
+      server.registerTool(calendarTool.name, calendarTool.definition, calendarTool.handler);
+      const contactsTool = createReadContactsTool(deps);
+      server.registerTool(contactsTool.name, contactsTool.definition, contactsTool.handler);
+      console.log('ai-tools: registered Google tools');
+    } catch (err) {
+      console.error('ai-tools: failed to register Google tools', err);
+    }
+  } else {
+    console.log('ai-tools: extension context missing, skipping Google tool registration');
+  }
 
   return server;
 }
