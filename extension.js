@@ -30,6 +30,14 @@ function activate(context) {
       try { httpServer.close(); } catch (err) { console.warn('ai-tools: failed to close http server', err); }
       httpServer = undefined;
     }
+
+    //STARTING HERE - All of this should move into createMcpServer we need to 
+    // pass _mcpEmitter or put it in the context to createMcpServer so it can 
+    // fire to Notify the provider to refresh with new port. Additonally, 
+    // createMcpServer needs to return the httpServer and serverUri as part of 
+    // an object, or perhaps in the context so they can be used above to close 
+    // the server and below to provide the server definitions.
+
     mcpServerInstance = createMcpServer({ context });
     transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     mcpServerInstance.connect(transport).then(() => {
@@ -116,6 +124,8 @@ function activate(context) {
       }
       _mcpEmitter.fire(); // Notify provider to refresh with new port
     });
+
+    //END HERE
   }
 
   // Start initially
